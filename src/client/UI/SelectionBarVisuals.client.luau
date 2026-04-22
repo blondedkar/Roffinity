@@ -10,7 +10,12 @@ local Navbar = Constraint:WaitForChild("Navbar")
 local SelectionBar = Navbar:WaitForChild("Selectionbar")
 
 local function UpdateSelectionBar()
+	local SelectionMode = Player:GetAttribute("SelectionMode")
 	local CurrentMode = Player:GetAttribute("CurrentMode") :: string?
+
+	if typeof(SelectionMode) == "string" and SelectionMode ~= "" then
+		CurrentMode = SelectionMode
+	end
 
 	for _, Child in ipairs(SelectionBar:GetChildren()) do
 		if Child:IsA("GuiObject") then
@@ -25,4 +30,5 @@ local function UpdateSelectionBar()
 end
 
 Player:GetAttributeChangedSignal("CurrentMode"):Connect(UpdateSelectionBar)
+Player:GetAttributeChangedSignal("SelectionMode"):Connect(UpdateSelectionBar)
 UpdateSelectionBar()

@@ -20,6 +20,8 @@ local ActiveMode = (Player:GetAttribute("CurrentMode") :: string?) or ""
 local PendingMode: string? = nil
 local RequestStartedAt = 0
 
+local SELECTION_MODE_ATTRIBUTE = "SelectionMode"
+
 local function IsModeButton(Instance: Instance): boolean
 	return Instance:IsA("TextButton") or Instance:IsA("ImageButton")
 end
@@ -55,6 +57,22 @@ end
 
 local function IsAdditionalModeButton(Instance: Instance): boolean
 	return (Instance:IsA("TextButton") or Instance:IsA("ImageButton")) and Instance.Parent ~= Toolbar
+end
+
+local function GetAdditionalButtons(): { GuiButton }
+	local Buttons = {}
+
+	for _, Descendant in ipairs(Extratools:GetDescendants()) do
+		if IsAdditionalModeButton(Descendant) then
+			table.insert(Buttons, Descendant :: GuiButton)
+		end
+	end
+
+	table.sort(Buttons, function(Left, Right)
+		return Left.Name < Right.Name
+	end)
+
+	return Buttons
 end
 
 local function UpdateExtratoolsForMode(Button: GuiButton?, ModeName: string?)
@@ -140,6 +158,10 @@ local function RequestModeChange(RequestedMode: string)
 	UpdateModeRemote:FireServer(RequestedMode)
 end
 
+local function SetSelectionMode(ModeName: string)
+	Player:SetAttribute(SELECTION_MODE_ATTRIBUTE, ModeName)
+end
+
 local function BindButton(Button: GuiButton)
 	Button.Activated:Connect(function()
 		local RequestedMode = GetModeName(Button)
@@ -148,7 +170,27 @@ local function BindButton(Button: GuiButton)
 			return
 		end
 
+		SetSelectionMode(RequestedMode)
 		UpdateExtratoolsForMode(Button, RequestedMode)
+		RequestModeChange(RequestedMode)
+	end)
+end
+
+local function BindAdditionalButton(Button: GuiButton)
+	Button.Activated:Connect(function()
+		local RequestedMode = GetModeName(Button)
+		if RequestedMode == nil then
+			warn(("Extra tool button %s is missing a valid mode name"):format(Button:GetFullName()))
+			return
+		end
+
+		local FromMode = Button:GetAttribute("FromMode")
+		if typeof(FromMode) == "string" and FromMode ~= "" then
+			SetSelectionMode(FromMode)
+		else
+			SetSelectionMode(RequestedMode)
+		end
+
 		RequestModeChange(RequestedMode)
 	end)
 end
@@ -157,10 +199,20 @@ for _, Button in ipairs(GetButtons()) do
 	BindButton(Button)
 end
 
+for _, Button in ipairs(GetAdditionalButtons()) do
+	BindAdditionalButton(Button)
+end
+
 Toolbar.DescendantAdded:Connect(function(Descendant)
 	if IsModeButton(Descendant) then
 		BindButton(Descendant :: GuiButton)
 		UpdateVisualState()
+	end
+end)
+
+Extratools.DescendantAdded:Connect(function(Descendant)
+	if IsAdditionalModeButton(Descendant) then
+		BindAdditionalButton(Descendant :: GuiButton)
 	end
 end)
 
@@ -194,3 +246,7 @@ for _, Button in ipairs(GetButtons()) do
 end
 
 UpdateExtratoolsForMode(InitialModeButton, ActiveMode)
+
+if Player:GetAttribute(SELECTION_MODE_ATTRIBUTE) == nil then
+	SetSelectionMode(if InitialModeButton then ActiveMode else "")
+end
